@@ -1,0 +1,83 @@
+# Test this without rebuilding the docker image $> docker-compose up
+# Test this with rebuilding the docker image $> docker-compose up --build
+
+version: '3.7'
+
+services:
+  master:
+    build:
+      context: .
+      dockerfile: SparkFHE-Master.dockerfile
+    image: sparkfhe/sparkfhe-master
+    container_name: master
+    working_dir: /spark-3.0.0-SNAPSHOT-bin-SparkFHE
+    networks:
+      - spakrfhe-network
+    ports:
+      - "5050"    # Mesos web UI port
+      - "7077"    # Mesos job submission port
+      - "9870"    # HDFS web UI port
+      - "9000"    # HDFS client API port
+    volumes:
+      - ./.sparkfhe-cache:/spark-3.0.0-SNAPSHOT-bin-SparkFHE/.sparkfhe-cache/
+    command:
+      - /bin/bash
+      - -c
+      - |
+        echo "Initialize master..."
+        /spark-3.0.0-SNAPSHOT-bin-SparkFHE/SparkFHE-Addon/scripts/docker/cluster/SparkFHE-master-startscript.bash &
+        tail -f /dev/null
+
+
+  worker1:
+    build:
+      context: .
+      dockerfile: SparkFHE-Worker.dockerfile
+    image: sparkfhe/sparkfhe-worker
+    container_name: worker1
+    depends_on:
+      - master
+    working_dir: /spark-3.0.0-SNAPSHOT-bin-SparkFHE
+    networks:
+      - spakrfhe-network
+    ports:
+      - "18080"    # Spark history server port 
+    volumes:
+      - ./.sparkfhe-cache:/spark-3.0.0-SNAPSHOT-bin-SparkFHE/.sparkfhe-cache/
+    command:
+      - /bin/bash
+      - -c
+      - |
+        echo "Initialize worker1..."
+        /spark-3.0.0-SNAPSHOT-bin-SparkFHE/SparkFHE-Addon/scripts/docker/cluster/SparkFHE-worker-startscript.bash &
+        tail -f /dev/null
+
+
+  worker2:
+    image: sparkfhe/sparkfhe-worker
+    container_name: worker2
+    depends_on:
+      - master
+      - worker1
+    working_dir: /spark-3.0.0-SNAPSHOT-bin-SparkFHE
+    networks:
+      - spakrfhe-network
+    ports:
+      - "18080"     # Spark history server port 
+    volumes:
+      - ./.sparkfhe-cache:/spark-3.0.0-SNAPSHOT-bin-SparkFHE/.sparkfhe-cache/
+    command:
+      - /bin/bash
+      - -c
+      - |
+        echo "Initialize worker2..."
+        /spark-3.0.0-SNAPSHOT-bin-SparkFHE/SparkFHE-Addon/scripts/docker/cluster/SparkFHE-worker-startscript.bash &
+        tail -f /dev/null
+
+
+
+
+networks:
+  spakrfhe-network:
+volumes:
+  .sparkfhe-cache:
